@@ -1,18 +1,17 @@
 use std::mem;
 
-windows::include_bindings!();
-use self::Windows::Win32::{
+use raw_window_handle::RawWindowHandle;
+use windows::Win32::{
     Foundation::HWND,
-    System::{
-        Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED},
-        Diagnostics::Debug::{FlashWindowEx, FLASHWINFO, FLASHW_STOP, FLASHW_TIMER, FLASHW_TRAY},
-    },
-    UI::Shell::{
-        ITaskbarList3, TaskbarList, TBPF_ERROR, TBPF_INDETERMINATE, TBPF_NOPROGRESS, TBPF_NORMAL,
-        TBPF_PAUSED,
+    System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED},
+    UI::{
+        Shell::{
+            ITaskbarList3, TaskbarList, TBPF_ERROR, TBPF_INDETERMINATE, TBPF_NOPROGRESS,
+            TBPF_NORMAL, TBPF_PAUSED,
+        },
+        WindowsAndMessaging::{FlashWindowEx, FLASHWINFO, FLASHW_STOP, FLASHW_TIMER, FLASHW_TRAY},
     },
 };
-use raw_window_handle::RawWindowHandle;
 
 use crate::ProgressIndicatorState;
 
@@ -27,12 +26,12 @@ pub struct TaskbarIndicator {
 impl TaskbarIndicator {
     pub fn new(window: RawWindowHandle) -> Result<Self, Box<dyn std::error::Error>> {
         let hwnd = match window {
-            RawWindowHandle::Windows(handle) => HWND(handle.hwnd as isize),
+            RawWindowHandle::Win32(handle) => HWND(handle.hwnd.get() as _),
             h @ _ => unimplemented!("{:?}", h),
         };
         unsafe {
             // Intialize COM library if it is not already done
-            let _ = CoInitializeEx(std::ptr::null_mut(), COINIT_MULTITHREADED);
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         }
         let taskbar: ITaskbarList3 = unsafe { CoCreateInstance(&TaskbarList, None, CLSCTX_ALL)? };
         Ok(Self {
@@ -100,7 +99,7 @@ impl TaskbarIndicator {
             dwTimeout: 0,
         };
         unsafe {
-            FlashWindowEx(&mut params);
+            let _ = FlashWindowEx(&mut params);
         }
         Ok(())
     }
